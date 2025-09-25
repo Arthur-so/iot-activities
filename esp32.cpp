@@ -1,4 +1,4 @@
-// C++ code
+// esp32
 enum State {
     IDLE,      // 00
     CLEANING,  // 01
@@ -10,26 +10,19 @@ State state = IDLE;
 
 const int OUTPUT1 = 2;
 const int OUTPUT2 = 4;
-const int LED_PIN = 25;
+const int LED3 = 25;
 
 unsigned long lastMillis;
-unsigned long time = 500;
+unsigned long tempo = 2000;
 
-int ledValue = 255;
-int fadeStep = 5;
-unsigned long lastFadeMillis;
-unsigned long fadeInterval = 30;
-
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   pinMode(OUTPUT1, OUTPUT);
   pinMode(OUTPUT2, OUTPUT);
-  dacWrite(LED_PIN, 255);
+  dacWrite(LED3, 255);
 }
 
-void loop()
-{
+void loop() {
   char input;
   if (Serial.available() > 0) {
     input = Serial.read();
@@ -37,42 +30,38 @@ void loop()
     input = '\0';
   }
 
-  switch(state) {
+  switch (state) {
     case IDLE:
       idle();
-      if(input == 'a') {
+      if (input == 'a') {
         state = CLEANING;
         lastMillis = millis();
-        ledValue = 255;  // brilho máximo ao entrar
       }
       break;
 
     case CLEANING:
-      cleaning();      		
-      if(input == 'b' || millis()-lastMillis > time) {
+      cleaning();
+      if (input == 'b' || millis() - lastMillis > tempo) {
         state = DOCKING;
         lastMillis = millis();
-        ledValue = 0;   // brilho mínimo ao sair
-        dacWrite(LED_PIN, ledValue);
       }
       break;
 
     case DOCKING:
       docking();
-      if(millis()-lastMillis > time) {
+      if (millis() - lastMillis > tempo) {
         state = CHARGING;
         lastMillis = millis();
-        ledValue = 0;   // inicia apagado ao entrar no charging
       }
       break;
 
     case CHARGING:
       charging();
-      if(input == 'a') {
+      if (input == 'a') {
         state = CLEANING;
-        ledValue = 255; // começa no máximo de novo
+        lastMillis = millis();
       }
-      if(millis()-lastMillis > time) {
+      if (millis() - lastMillis > tempo) {
         state = IDLE;
         lastMillis = millis();
       }
@@ -80,15 +69,12 @@ void loop()
   }
 }
 
-// ----- Funções dos estados -----
-
 void idle() {
   Serial.println("idle");
   digitalWrite(OUTPUT1, LOW);
   digitalWrite(OUTPUT2, LOW);
-
-  // LED sempre ligado no máximo
-  dacWrite(LED_PIN, 255);
+  // LED sempre ligado
+  dacWrite(LED3, 255);
 }
 
 void cleaning() {
@@ -96,24 +82,21 @@ void cleaning() {
   digitalWrite(OUTPUT1, LOW);
   digitalWrite(OUTPUT2, HIGH);
 
-  // LED reduzindo intensidade gradualmente
-  if (millis() - lastFadeMillis > fadeInterval) {
-    lastFadeMillis = millis();
-    if (ledValue > 0) {
-      ledValue -= fadeStep;
-      if (ledValue < 0) ledValue = 0;
-      dacWrite(LED_PIN, ledValue);
-    }
-  }
+  // tempo decorrido
+  unsigned long elapsed = millis() - lastMillis;
+  if (elapsed > tempo) elapsed = tempo;
+
+  // intensidade decresce de 255 -> 0
+  int brightness = map(elapsed, 0, tempo, 255, 0);
+  dacWrite(LED3, brightness);
 }
 
 void docking() {
   Serial.println("docking");
   digitalWrite(OUTPUT1, HIGH);
-  digitalWrite(OUTPUT2, LOW);	
-
-  // LED apagado
-  dacWrite(LED_PIN, 0);
+  digitalWrite(OUTPUT2, LOW);
+  // LED sempre apagado
+  dacWrite(LED3, 0);
 }
 
 void charging() {
@@ -121,14 +104,11 @@ void charging() {
   digitalWrite(OUTPUT1, HIGH);
   digitalWrite(OUTPUT2, HIGH);
 
-  // LED aumentando intensidade gradualmente
-  if (millis() - lastFadeMillis > fadeInterval) {
-    lastFadeMillis = millis();
-    if (ledValue < 255) {
-      ledValue += fadeStep;
-      if (ledValue > 255) ledValue = 255;
-      dacWrite(LED_PIN, ledValue);
-    }
-  }
-}
+  // tempo decorrido
+  unsigned long elapsed = millis() - lastMillis;
+  if (elapsed > tempo) elapsed = tempo;
 
+  // intensidade cresce de 0 -> 255
+  int brightness = map(elapsed, 0, tempo, 0, 255);
+  dacWrite(LED3, brightness);
+}
