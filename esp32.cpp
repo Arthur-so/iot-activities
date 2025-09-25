@@ -1,25 +1,36 @@
-// esp32
+//esp32
+
 enum State {
-    IDLE,      // 00
-    CLEANING,  // 01
-    DOCKING,   // 10
-    CHARGING   // 11
+    IDLE,      
+    CLEANING, 
+    DOCKING,  
+    CHARGING   
 };
 
 State state = IDLE;
 
 const int OUTPUT1 = 2;
 const int OUTPUT2 = 4;
-const int LED3 = 25;
+const int LED3   = 25;  
+
+const int DIST_IN1 = 22; 
+const int DIST_IN2 = 23;  
 
 unsigned long lastMillis;
-unsigned long tempo = 2000;
+unsigned long tempo = 10000;
+
+unsigned long lastPrint = 0;
+unsigned long printInterval = 1000;
 
 void setup() {
   Serial.begin(115200);
   pinMode(OUTPUT1, OUTPUT);
   pinMode(OUTPUT2, OUTPUT);
-  dacWrite(LED3, 255);
+
+  pinMode(DIST_IN1, INPUT);
+  pinMode(DIST_IN2, INPUT);
+
+  dacWrite(LED3, 255); 
 }
 
 void loop() {
@@ -30,6 +41,26 @@ void loop() {
     input = '\0';
   }
 
+  // ---------- Lê estado de distância do Arduino ----------
+  static int lastDistState = -1; 
+  int d1 = digitalRead(DIST_IN1);
+  int d2 = digitalRead(DIST_IN2);
+  int distState = (d1 << 1) | d2; 
+
+  // imprime apenas quando muda OU a cada printInterval
+  if (distState != lastDistState || millis() - lastPrint >= printInterval) {
+    lastPrint = millis();
+    lastDistState = distState;
+
+    switch (distState) {
+      case 0: Serial.println("Sem obstáculos"); break;
+      case 1: Serial.println("Longe"); break;
+      case 2: Serial.println("Meia distância"); break;
+      case 3: Serial.println("Perto"); break;
+    }
+  }
+
+  // ---------- Máquina de estados principal ----------
   switch (state) {
     case IDLE:
       idle();
@@ -69,46 +100,41 @@ void loop() {
   }
 }
 
+// ---------------- FUNÇÕES DOS ESTADOS ----------------
 void idle() {
-  Serial.println("idle");
+  //Serial.println("idle");
   digitalWrite(OUTPUT1, LOW);
   digitalWrite(OUTPUT2, LOW);
-  // LED sempre ligado
-  dacWrite(LED3, 255);
+  dacWrite(LED3, 255); 
 }
 
 void cleaning() {
-  Serial.println("cleaning");
+  //Serial.println("cleaning");
   digitalWrite(OUTPUT1, LOW);
   digitalWrite(OUTPUT2, HIGH);
 
-  // tempo decorrido
   unsigned long elapsed = millis() - lastMillis;
   if (elapsed > tempo) elapsed = tempo;
 
-  // intensidade decresce de 255 -> 0
   int brightness = map(elapsed, 0, tempo, 255, 0);
   dacWrite(LED3, brightness);
 }
 
 void docking() {
-  Serial.println("docking");
+  //Serial.println("docking");
   digitalWrite(OUTPUT1, HIGH);
   digitalWrite(OUTPUT2, LOW);
-  // LED sempre apagado
-  dacWrite(LED3, 0);
+  dacWrite(LED3, 0); 
 }
 
 void charging() {
-  Serial.println("charging");
+  //Serial.println("charging");
   digitalWrite(OUTPUT1, HIGH);
   digitalWrite(OUTPUT2, HIGH);
 
-  // tempo decorrido
   unsigned long elapsed = millis() - lastMillis;
   if (elapsed > tempo) elapsed = tempo;
 
-  // intensidade cresce de 0 -> 255
   int brightness = map(elapsed, 0, tempo, 0, 255);
   dacWrite(LED3, brightness);
 }
